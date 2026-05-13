@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './ResultRegister.css'; // Make sure to save your CSS here
+import './ResultRegister.css';
 
 const PASS = 33;
 
@@ -96,7 +96,8 @@ export default function ResultRegister() {
   let anyFail = false;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', minHeight: '100vh', padding: '24px 10px', background: '#cfc8bc', fontFamily: "'Outfit', sans-serif" }}>
+      
       {/* LOGO MODAL */}
       <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`} onClick={(e) => { if (e.target.className.includes('modal-overlay')) setIsModalOpen(false); }}>
         <div className="modal">
@@ -344,4 +345,12 @@ export default function ResultRegister() {
         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gAp">A+</span>90–100%</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gA">A</span>80–89%</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gBp">B+</span>70–79%</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gB">B</span>60–69%</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gC">C</span>50–59%</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gD">D</span>33–49%</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gF">F</span>&lt;33%</span>
+        <span style={{ marginLeft: '10px', fontSize: '10px', color: '#444' }}><b>Pass Marks:</b> 33%</span>
+      </div>
+    </div>
+  );
+}
