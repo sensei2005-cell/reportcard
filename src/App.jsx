@@ -1,807 +1,347 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import * as mammoth from "mammoth";
-import * as XLSX from "xlsx";
-import * as pdfjsLib from "pdfjs-dist";
+import React, { useState, useEffect } from 'react';
+import './ResultRegister.css'; // Make sure to save your CSS here
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const PASS = 33;
 
-const C = {
-  bg: "#0a0a0f",
-  surface: "#13131a",
-  card: "#1a1a24",
-  border: "#252530",
-  accent: "#f97316",
-  accentDim: "#f9731622",
-  text: "#f0f0f8",
-  muted: "#5a5a70",
-  green: "#22c55e",
-  blue: "#3b82f6",
-  red: "#ef4444",
-  purple: "#a855f7",
-  yellow: "#f59e0b",
-  pink: "#ec4899",
+const initialSubjects = [
+  { n: 'Hindi', c: 'Lang. – 101', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+  { n: 'Mathematics', c: 'Math – 201', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+  { n: 'English', c: 'Lang. – 102', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+  { n: 'Social Science', c: 'SS – 301', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+  { n: 'Science', c: 'Sci – 401', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+  { n: 'Art & Craft', c: 'Art – 501', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+  { n: 'Sanskrit / Urdu', c: 'Lang. – 103', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+  { n: 'Agriculture / Home', c: 'Voc – 601', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+  { n: 'Physical Training', c: 'PT – 701', t: [6, 5, 6, 7], monthlyMax: 40, hy: { mx: 80, ob: 70, pr: 0 }, an: { mx: 80, ob: 75, pr: 0 } },
+];
+
+const gradeInfo = (p) => {
+  if (p >= 90) return { l: 'A+', c: 'gAp' };
+  if (p >= 80) return { l: 'A', c: 'gA' };
+  if (p >= 70) return { l: 'B+', c: 'gBp' };
+  if (p >= 60) return { l: 'B', c: 'gB' };
+  if (p >= 50) return { l: 'C', c: 'gC' };
+  if (p >= 33) return { l: 'D', c: 'gD' };
+  return { l: 'F', c: 'gF' };
 };
 
-const FILE_META = {
-  pdf: { label: "PDF", color: C.red, icon: "📄" },
-  docx: { label: "WORD", color: C.blue, icon: "📝" },
-  doc: { label: "WORD", color: C.blue, icon: "📝" },
-  xlsx: { label: "EXCEL", color: C.green, icon: "📊" },
-  xls: { label: "EXCEL", color: C.green, icon: "📊" },
-  csv: { label: "CSV", color: C.green, icon: "📋" },
-  txt: { label: "TXT", color: C.purple, icon: "📃" },
-  md: { label: "MD", color: C.yellow, icon: "✍️" },
-  json: { label: "JSON", color: "#06b6d4", icon: "🔧" },
-  png: { label: "IMG", color: C.pink, icon: "🖼️" },
-  jpg: { label: "IMG", color: C.pink, icon: "🖼️" },
-  jpeg: { label: "IMG", color: C.pink, icon: "🖼️" },
-  gif: { label: "IMG", color: C.pink, icon: "🖼️" },
-  webp: { label: "IMG", color: C.pink, icon: "🖼️" },
-  svg: { label: "SVG", color: C.accent, icon: "🎨" },
-};
+const barCol = (p) => (p >= 75 ? '#22c55e' : p >= 50 ? '#3b82f6' : p >= 33 ? '#f59e0b' : '#ef4444');
 
-const getExt = (n) => n.split(".").pop().toLowerCase();
-
-const fmtSize = (b) =>
-  b > 1048576
-    ? (b / 1048576).toFixed(1) + " MB"
-    : (b / 1024).toFixed(0) + " KB";
-
-function Spinner({ label = "Loading…" }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 16,
-        padding: 64,
-      }}
-    >
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          border: `3px solid ${C.border}`,
-          borderTop: `3px solid ${C.accent}`,
-          borderRadius: "50%",
-          animation: "spin .8s linear infinite",
-        }}
-      />
-      <span style={{ color: C.muted, fontSize: 13 }}>{label}</span>
-    </div>
-  );
-}
-
-function PDFViewer({ file }) {
-  const [pages, setPages] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function ResultRegister() {
+  const [subjects, setSubjects] = useState(initialSubjects);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentLogoUrl, setCurrentLogoUrl] = useState(null);
+  const [pendingLogoUrl, setPendingLogoUrl] = useState(null);
+  const [dateStr, setDateStr] = useState('');
 
   useEffect(() => {
-    let dead = false;
-
-    (async () => {
-      try {
-        const pdf = await pdfjsLib.getDocument({
-          data: await file.arrayBuffer(),
-        }).promise;
-
-        const imgs = [];
-
-        for (let i = 1; i <= Math.min(pdf.numPages, 20); i++) {
-          const page = await pdf.getPage(i);
-
-          const viewport = page.getViewport({
-            scale: window.innerWidth < 500 ? 1.4 : 2,
-          });
-
-          const canvas = document.createElement("canvas");
-
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-
-          await page.render({
-            canvasContext: canvas.getContext("2d"),
-            viewport,
-          }).promise;
-
-          imgs.push({
-            src: canvas.toDataURL(),
-            num: i,
-          });
-        }
-
-        if (!dead) {
-          setPages(imgs);
-          setLoading(false);
-        }
-      } catch {
-        if (!dead) setLoading(false);
-      }
-    })();
-
-    return () => {
-      dead = true;
-    };
-  }, [file]);
-
-  if (loading) return <Spinner label="Rendering PDF…" />;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {pages.map((p) => (
-        <div key={p.num} style={{ position: "relative" }}>
-          <div
-            style={{
-              position: "absolute",
-              top: 10,
-              left: 10,
-              background: "#000c",
-              color: "#fff",
-              borderRadius: 6,
-              padding: "3px 10px",
-              fontSize: 12,
-              fontWeight: 700,
-              zIndex: 1,
-            }}
-          >
-            p.{p.num}
-          </div>
-
-          <img
-            src={p.src}
-            alt=""
-            style={{
-              width: "100%",
-              borderRadius: 12,
-              display: "block",
-              border: `1px solid ${C.border}`,
-            }}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DocxViewer({ file }) {
-  const [html, setHtml] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let dead = false;
-
-    (async () => {
-      try {
-        const res = await mammoth.convertToHtml({
-          arrayBuffer: await file.arrayBuffer(),
-        });
-
-        if (!dead) {
-          setHtml(res.value);
-          setLoading(false);
-        }
-      } catch {
-        if (!dead) setLoading(false);
-      }
-    })();
-
-    return () => {
-      dead = true;
-    };
-  }, [file]);
-
-  if (loading) return <Spinner label="Parsing document…" />;
-
-  return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 12,
-        padding: 20,
-        color: "#111",
-        lineHeight: 1.8,
-        overflowX: "auto",
-      }}
-      dangerouslySetInnerHTML={{
-        __html: html || "<p>Empty document.</p>",
-      }}
-    />
-  );
-}
-
-function ExcelViewer({ file }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let dead = false;
-
-    (async () => {
-      try {
-        const wb = XLSX.read(await file.arrayBuffer(), {
-          type: "array",
-        });
-
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-
-        const data = XLSX.utils.sheet_to_json(sheet, {
-          header: 1,
-        });
-
-        if (!dead) {
-          setRows(data);
-          setLoading(false);
-        }
-      } catch {
-        if (!dead) setLoading(false);
-      }
-    })();
-
-    return () => {
-      dead = true;
-    };
-  }, [file]);
-
-  if (loading) return <Spinner label="Parsing spreadsheet…" />;
-
-  return (
-    <div
-      style={{
-        overflowX: "auto",
-        borderRadius: 10,
-        border: `1px solid ${C.border}`,
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
-      <table
-        style={{
-          borderCollapse: "collapse",
-          minWidth: "100%",
-          fontSize: 13,
-        }}
-      >
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri}>
-              {row.map((cell, ci) => (
-                <td
-                  key={ci}
-                  style={{
-                    padding: "10px 14px",
-                    border: `1px solid ${C.border}`,
-                    color: C.text,
-                    whiteSpace: "nowrap",
-                    background: ri === 0 ? C.card : C.surface,
-                    fontWeight: ri === 0 ? 700 : 400,
-                  }}
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function TextViewer({ file }) {
-  const [text, setText] = useState("");
-
-  useEffect(() => {
-    file.text().then(setText);
-  }, [file]);
-
-  return (
-    <pre
-      style={{
-        background: C.card,
-        padding: 16,
-        borderRadius: 12,
-        overflowX: "auto",
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word",
-        fontSize: 13,
-        lineHeight: 1.7,
-      }}
-    >
-      {text}
-    </pre>
-  );
-}
-
-function ImageViewer({ file }) {
-  const [src, setSrc] = useState("");
-
-  useEffect(() => {
-    const url = URL.createObjectURL(file);
-
-    setSrc(url);
-
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-
-  return (
-    <img
-      src={src}
-      alt=""
-      style={{
-        width: "100%",
-        borderRadius: 12,
-        display: "block",
-      }}
-    />
-  );
-}
-
-function FileContent({ file }) {
-  const ext = getExt(file.name);
-
-  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext))
-    return <ImageViewer file={file} />;
-
-  if (ext === "pdf") return <PDFViewer file={file} />;
-
-  if (["docx", "doc"].includes(ext))
-    return <DocxViewer file={file} />;
-
-  if (["xlsx", "xls", "csv"].includes(ext))
-    return <ExcelViewer file={file} />;
-
-  return <TextViewer file={file} />;
-}
-
-export default function App() {
-  const [files, setFiles] = useState([]);
-  const [active, setActive] = useState(null);
-  const [view, setView] = useState("home");
-  const [dragging, setDragging] = useState(false);
-
-  const inputRef = useRef();
-
-  const addFiles = useCallback((newFiles) => {
-    const arr = Array.from(newFiles);
-
-    setFiles((prev) => [
-      ...prev,
-      ...arr.filter(
-        (f) => !prev.find((p) => p.name === f.name && p.size === f.size)
-      ),
-    ]);
-
-    setView("files");
+    setDateStr("Issued: " + new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }));
   }, []);
 
-  const current = active !== null ? files[active] : null;
+  const resetAll = () => {
+    setSubjects(subjects.map(s => ({
+      ...s,
+      t: [0, 0, 0, 0],
+      hy: { ...s.hy, ob: 0, pr: 0 },
+      an: { ...s.an, ob: 0, pr: 0 }
+    })));
+  };
+
+  const updateSubject = (index, field, val, subfield = null, testIndex = null) => {
+    const newSubjects = [...subjects];
+    if (testIndex !== null) {
+      newSubjects[index][field][testIndex] = Number(val) || 0;
+    } else if (subfield !== null) {
+      newSubjects[index][field][subfield] = Number(val) || 0;
+    } else {
+      newSubjects[index][field] = val;
+    }
+    setSubjects(newSubjects);
+  };
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File too large. Max 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setPendingLogoUrl(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPendingLogoUrl(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const applyLogo = () => {
+    if (pendingLogoUrl) setCurrentLogoUrl(pendingLogoUrl);
+    setIsModalOpen(false);
+  };
+
+  const removeLogo = () => {
+    setCurrentLogoUrl(null);
+    setPendingLogoUrl(null);
+    setIsModalOpen(false);
+  };
+
+  let gObt = 0;
+  let gMax = 0;
+  let anyFail = false;
 
   return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        background: C.bg,
-        color: C.text,
-        fontFamily: "'DM Sans','Segoe UI',sans-serif",
-        width: "100%",
-        overflowX: "hidden",
-        display: "flex",
-        justifyContent: "center",
-      }}
-    >
-      <style>{`
-        *{
-          box-sizing:border-box;
-          margin:0;
-          padding:0;
-          -webkit-tap-highlight-color:transparent;
-        }
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+      {/* LOGO MODAL */}
+      <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`} onClick={(e) => { if (e.target.className.includes('modal-overlay')) setIsModalOpen(false); }}>
+        <div className="modal">
+          <h3>🏫 School Logo</h3>
+          <p>Upload your school logo. It will replace the seal in the header. Supports JPG, PNG, SVG, WebP.</p>
 
-        html,body,#root{
-          width:100%;
-          min-height:100%;
-          background:${C.bg};
-          overflow-x:hidden;
-        }
-
-        body{
-          touch-action:manipulation;
-          -webkit-font-smoothing:antialiased;
-        }
-
-        button{
-          font:inherit;
-        }
-
-        img{
-          max-width:100%;
-          height:auto;
-        }
-
-        @keyframes spin{
-          to{
-            transform:rotate(360deg)
-          }
-        }
-
-        @keyframes fadeUp{
-          from{
-            opacity:0;
-            transform:translateY(20px)
-          }
-          to{
-            opacity:1;
-            transform:translateY(0)
-          }
-        }
-
-        .tap:active{
-          transform:scale(.97);
-          opacity:.7;
-        }
-
-        ::-webkit-scrollbar{
-          width:3px;
-          height:3px;
-        }
-
-        ::-webkit-scrollbar-thumb{
-          background:${C.border};
-        }
-      `}</style>
-
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        hidden
-        onChange={(e) => addFiles(e.target.files)}
-      />
-
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 480,
-          minHeight: "100dvh",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {view === "home" && (
           <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              padding: 20,
-              animation: "fadeUp .3s ease",
-            }}
+            className="logo-drop"
+            onClick={() => document.getElementById('logoFileInput').click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
           >
-            <div style={{ textAlign: "center", marginTop: 50 }}>
-              <div
-                style={{
-                  width: 90,
-                  height: 90,
-                  borderRadius: 28,
-                  background: `linear-gradient(135deg,${C.accent},#fb923c)`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 42,
-                  margin: "0 auto 22px",
-                }}
-              >
-                📂
-              </div>
+            <div className="icon">🖼️</div>
+            <strong>Click to browse or drag & drop</strong>
+            <p>JPG, PNG, SVG, WebP — max 5MB</p>
+          </div>
+          <input type="file" id="logoFileInput" accept="image/*" style={{ display: 'none' }} onChange={handleLogoChange} />
 
-              <h1
-                style={{
-                  fontSize: window.innerWidth < 400 ? 24 : 30,
-                  fontWeight: 800,
-                  marginBottom: 8,
-                }}
-              >
-                FileViewer
-              </h1>
-
-              <p
-                style={{
-                  color: C.muted,
-                  fontSize: 14,
-                  lineHeight: 1.7,
-                }}
-              >
-                Open and preview files directly on mobile
-              </p>
+          {(pendingLogoUrl || currentLogoUrl) && (
+            <div className="logo-preview-wrap" style={{ display: 'block' }}>
+              <img src={pendingLogoUrl || currentLogoUrl} alt="Preview" />
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>Preview — looks good?</p>
             </div>
+          )}
 
-            <div
-              className="tap"
-              onClick={() => inputRef.current.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragging(false);
-
-                if (e.dataTransfer.files.length) {
-                  addFiles(e.dataTransfer.files);
-                }
-              }}
-              style={{
-                marginTop: 40,
-                border: `2px dashed ${
-                  dragging ? C.accent : C.border
-                }`,
-                borderRadius: 20,
-                padding:
-                  window.innerWidth < 400
-                    ? "32px 18px"
-                    : "44px 24px",
-                textAlign: "center",
-                background: dragging
-                  ? C.accentDim
-                  : "transparent",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ fontSize: 42, marginBottom: 12 }}>
-                📁
-              </div>
-
-              <div
-                style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  marginBottom: 6,
-                }}
-              >
-                Tap to open files
-              </div>
-
-              <div
-                style={{
-                  color: C.muted,
-                  fontSize: 13,
-                }}
-              >
-                PDF · Word · Excel · Images
-              </div>
-            </div>
-
-            {files.length > 0 && (
-              <button
-                className="tap"
-                onClick={() => setView("files")}
-                style={{
-                  marginTop: 20,
-                  background: C.card,
-                  border: `1px solid ${C.border}`,
-                  color: C.text,
-                  borderRadius: 14,
-                  padding: 16,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                View {files.length} file
-                {files.length > 1 ? "s" : ""}
-              </button>
+          <div className="modal-btns">
+            {(currentLogoUrl || pendingLogoUrl) && (
+              <button className="btn-sm btn-remove" onClick={removeLogo}>Remove Logo</button>
+            )}
+            <button className="btn-sm btn-cancel" onClick={() => setIsModalOpen(false)}>Cancel</button>
+            {(pendingLogoUrl || currentLogoUrl) && (
+              <button className="btn-sm btn-apply" onClick={applyLogo}>✓ Apply Logo</button>
             )}
           </div>
-        )}
+        </div>
+      </div>
 
-        {view === "files" && (
-          <div
-            style={{
-              flex: 1,
-              padding: 16,
-              animation: "fadeUp .3s ease",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                marginBottom: 18,
-                gap: 10,
-              }}
-            >
-              <button
-                className="tap"
-                onClick={() => setView("home")}
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 12,
-                  border: `1px solid ${C.border}`,
-                  background: C.card,
-                  color: C.text,
-                  cursor: "pointer",
-                }}
-              >
-                ←
-              </button>
+      {/* TOOLBAR */}
+      <div className="toolbar">
+        <span className="toolbar-title">📋 Shan Inter College — Result Register</span>
+        <span className="tip">✏️ Every field editable — click any cell, header or text</span>
+        <button className="btn btn-logo" onClick={() => setIsModalOpen(true)}>🏫 School Logo</button>
+        <button className="btn btn-out" onClick={resetAll}>🔄 Reset</button>
+        <button className="btn btn-gold" onClick={() => window.print()}>🖨️ Print / PDF</button>
+      </div>
 
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontWeight: 800,
-                    fontSize: 20,
-                  }}
-                >
-                  My Files
-                </div>
-
-                <div
-                  style={{
-                    color: C.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  {files.length} files
-                </div>
+      {/* CARD */}
+      <div className="card">
+        {/* HEADER */}
+        <div className="ch" style={{ position: 'relative' }}>
+          <div className="edit-hint">✏️ click text to edit</div>
+          <div className="hi">
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div className="seal" onClick={() => setIsModalOpen(true)} title="Click to change logo">
+                {currentLogoUrl ? <img src={currentLogoUrl} alt="School Logo" /> : <span>S</span>}
+              </div>
+              <div className="seal-hint">{currentLogoUrl ? 'click to\nchange' : 'click to\nadd logo'}</div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div className="cn" contentEditable suppressContentEditableWarning>Shan Inter College</div>
+              <div className="cs" contentEditable suppressContentEditableWarning>Naroda, Moradabad — Uttar Pradesh</div>
+              <div className="ca" contentEditable suppressContentEditableWarning>✦ U.P. Board Affiliated &nbsp;|&nbsp; Recognised by Madhyamik Shiksha Parishad, U.P. &nbsp;|&nbsp; Est. 2000</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="badge" contentEditable suppressContentEditableWarning>Examination Result Register</div>
+              <div className="bsub" style={{ marginTop: '5px' }}>
+                School: <span contentEditable suppressContentEditableWarning style={{ outline: 'none', borderBottom: '1px dashed rgba(255,255,255,.3)', color: 'rgba(255,255,255,.7)' }}>Shan Inter College</span>
+                &nbsp;|&nbsp; Session: <span contentEditable suppressContentEditableWarning style={{ outline: 'none', borderBottom: '1px dashed rgba(255,255,255,.3)', color: 'rgba(255,255,255,.7)' }}>2024–25</span>
               </div>
             </div>
-
-            {files.map((f, i) => {
-              const ext = getExt(f.name);
-              const meta =
-                FILE_META[ext] || {
-                  icon: "📁",
-                  color: C.muted,
-                  label: ext.toUpperCase(),
-                };
-
-              return (
-                <div
-                  key={i}
-                  className="tap"
-                  onClick={() => {
-                    setActive(i);
-                    setView("viewer");
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: 14,
-                    background: C.card,
-                    borderRadius: 16,
-                    marginBottom: 12,
-                    border: `1px solid ${C.border}`,
-                    cursor: "pointer",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 14,
-                      background: meta.color + "22",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 26,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {meta.icon}
-                  </div>
-
-                  <div
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {f.name}
-                    </div>
-
-                    <div
-                      style={{
-                        marginTop: 6,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          background: meta.color + "22",
-                          color: meta.color,
-                          borderRadius: 5,
-                          padding: "2px 7px",
-                          fontSize: 10,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {meta.label}
-                      </span>
-
-                      <span
-                        style={{
-                          color: C.muted,
-                          fontSize: 12,
-                        }}
-                      >
-                        {fmtSize(f.size)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
-        )}
+        </div>
 
-        {view === "viewer" && current && (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                padding: 14,
-                borderBottom: `1px solid ${C.border}`,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                background: C.surface,
-                position: "sticky",
-                top: 0,
-                zIndex: 20,
-              }}
-            >
-              <button
-                className="tap"
-                onClick={() => setView("files")}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  border: `1px solid ${C.border}`,
-                  background: C.card,
-                  color: C.text,
-                  cursor: "pointer",
-                }}
-              >
-                ←
-              </button>
+        {/* META STRIP */}
+        <div className="meta">
+          {[
+            ['Student Name', 'Aryan Sharma'], ['Serial No.', '1'], ['Roll No.', '265 / 603'], ['Admission No.', 'SIC-2022-0265'],
+            ['Class / Section', 'VIII – A'], ['Stream', 'Science'], ["Father's Name", 'Mr. Rajesh Sharma'], ["Mother's Name", 'Mrs. Sunita Sharma']
+          ].map(([label, value], i) => (
+            <div className="mc" key={i}>
+              <div className="ml" contentEditable suppressContentEditableWarning>{label}</div>
+              <div className="mv" contentEditable suppressContentEditableWarning>{value}</div>
+            </div>
+          ))}
+        </div>
 
-              <div
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {current.name}
-                </div>
+        {/* TABLE */}
+        <div className="twrap">
+          <table className="mt">
+            <thead>
+              <tr className="grp">
+                <th rowSpan={2} style={{ background: '#1a3460', width: '22px' }} contentEditable suppressContentEditableWarning>S.No.</th>
+                <th rowSpan={2} style={{ background: '#1a3460', textAlign: 'left', paddingLeft: '8px', minWidth: '130px' }} contentEditable suppressContentEditableWarning>Subject / Code</th>
+                <th colSpan={4} className="g-mon" contentEditable suppressContentEditableWarning>Monthly Test Marks (Max 20 each)</th>
+                <th colSpan={2} className="g-best" contentEditable suppressContentEditableWarning>Marks Obtained</th>
+                <th colSpan={4} className="g-hy" contentEditable suppressContentEditableWarning>Half-Yearly Examination</th>
+                <th colSpan={4} className="g-an" contentEditable suppressContentEditableWarning>Annual Examination</th>
+                <th colSpan={3} className="g-tot" contentEditable suppressContentEditableWarning>Grand Total</th>
+                <th rowSpan={2} className="g-tot" style={{ minWidth: '95px' }} contentEditable suppressContentEditableWarning>Result / Remarks</th>
+              </tr>
+              <tr className="shd">
+                <th contentEditable suppressContentEditableWarning>Test I</th>
+                <th contentEditable suppressContentEditableWarning>Test II</th>
+                <th contentEditable suppressContentEditableWarning>Test III</th>
+                <th contentEditable suppressContentEditableWarning>Test IV</th>
+                <th style={{ background: '#152d58' }} contentEditable suppressContentEditableWarning>Max</th>
+                <th style={{ background: '#152d58' }} contentEditable suppressContentEditableWarning>Obtained</th>
+                <th contentEditable suppressContentEditableWarning>Max<br />Marks</th>
+                <th contentEditable suppressContentEditableWarning>Marks<br />Obtained</th>
+                <th contentEditable suppressContentEditableWarning>Practical</th>
+                <th contentEditable suppressContentEditableWarning>Total</th>
+                <th contentEditable suppressContentEditableWarning>Max<br />Marks</th>
+                <th contentEditable suppressContentEditableWarning>Marks<br />Obtained</th>
+                <th contentEditable suppressContentEditableWarning>Practical</th>
+                <th contentEditable suppressContentEditableWarning>Total</th>
+                <th contentEditable suppressContentEditableWarning>Max<br />Marks</th>
+                <th contentEditable suppressContentEditableWarning>Marks<br />Obtained</th>
+                <th contentEditable suppressContentEditableWarning>%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subjects.map((s, si) => {
+                const totalTests = s.t.reduce((a, b) => a + Number(b || 0), 0);
+                const hyObt = Number(s.hy.ob || 0) + Number(s.hy.pr || 0);
+                const anObt = Number(s.an.ob || 0) + Number(s.an.pr || 0);
+                const totMax = Number(s.hy.mx || 0) + Number(s.an.mx || 0) + (s.monthlyMax || 40);
+                const totObt = hyObt + anObt + totalTests;
+                const pct = totMax ? (totObt / totMax) * 100 : 0;
+                const pass = totMax === 0 || pct >= PASS;
+                if (!pass && totMax > 0) anyFail = true;
+                const g = gradeInfo(pct);
 
-                <div
-                  style={{
-           
+                gObt += totObt;
+                gMax += totMax;
+
+                return (
+                  <tr className="sr" key={si}>
+                    <td style={{ fontSize: '10px', color: '#8a9ab0', fontWeight: 600 }}>
+                      <input className="e" type="number" min="1" value={s.sno || si + 1} style={{ width: '28px', color: '#8a9ab0', fontWeight: 600 }} onChange={(e) => updateSubject(si, 'sno', e.target.value)} />
+                    </td>
+                    <td className="sn">
+                      <input className="e" type="text" value={s.n} placeholder="Subject Name" style={{ width: '100%', fontWeight: 600, fontSize: '11px', textAlign: 'left' }} onChange={(e) => updateSubject(si, 'n', e.target.value)} />
+                      <input className="e" type="text" value={s.c} placeholder="Code" style={{ width: '100%', fontSize: '9px', color: '#8a9ab0', textAlign: 'left', marginTop: '2px' }} onChange={(e) => updateSubject(si, 'c', e.target.value)} />
+                    </td>
+                    {s.t.map((v, ti) => (
+                      <td key={ti}>
+                        <input className="e" type="number" min="0" max="100" value={v || ''} placeholder="—" style={{ width: '28px' }} onChange={(e) => updateSubject(si, 't', e.target.value, null, ti)} />
+                      </td>
+                    ))}
+                    <td style={{ fontWeight: 700, background: '#eef2f8', color: '#152d58' }}>
+                      <input className="e" type="number" min="0" value={s.monthlyMax || 40} style={{ width: '36px', fontWeight: 700, color: '#152d58' }} onChange={(e) => updateSubject(si, 'monthlyMax', e.target.value)} />
+                    </td>
+                    <td style={{ fontWeight: 700, background: '#eef2f8', color: '#1e3a6e' }}>{totalTests || '—'}</td>
+
+                    <td><input className="e" type="number" min="0" max="999" value={s.hy.mx || ''} placeholder="—" style={{ width: '36px' }} onChange={(e) => updateSubject(si, 'hy', e.target.value, 'mx')} /></td>
+                    <td><input className="e" type="number" min="0" max="999" value={s.hy.ob || ''} placeholder="—" style={{ width: '36px' }} onChange={(e) => updateSubject(si, 'hy', e.target.value, 'ob')} /></td>
+                    <td><input className="e" type="number" min="0" max="100" value={s.hy.pr || ''} placeholder="—" style={{ width: '30px' }} onChange={(e) => updateSubject(si, 'hy', e.target.value, 'pr')} /></td>
+                    <td style={{ fontWeight: 700, color: '#163060', background: '#f0f4fb' }}>{hyObt || '—'}</td>
+
+                    <td><input className="e" type="number" min="0" max="999" value={s.an.mx || ''} placeholder="—" style={{ width: '36px' }} onChange={(e) => updateSubject(si, 'an', e.target.value, 'mx')} /></td>
+                    <td><input className="e" type="number" min="0" max="999" value={s.an.ob || ''} placeholder="—" style={{ width: '36px' }} onChange={(e) => updateSubject(si, 'an', e.target.value, 'ob')} /></td>
+                    <td><input className="e" type="number" min="0" max="100" value={s.an.pr || ''} placeholder="—" style={{ width: '30px' }} onChange={(e) => updateSubject(si, 'an', e.target.value, 'pr')} /></td>
+                    <td style={{ fontWeight: 700, color: '#0f2244', background: '#f5f0e8' }}>{anObt || '—'}</td>
+
+                    <td style={{ fontWeight: 700 }}>{totMax || '—'}</td>
+                    <td style={{ fontWeight: 700, color: '#0b1a2e' }}>{totObt || '—'}</td>
+                    <td style={{ fontWeight: 700, color: barCol(pct), fontSize: '11px' }}>{totMax ? pct.toFixed(1) + '%' : '—'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {totMax ? <><span className={`g ${g.c}`}>{g.l}</span><br /></> : ''}
+                      {totMax ? (pass ? <span className="pass">✔ Pass</span> : <span className="fail">✘ Fail</span>) : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {/* TOTAL ROW */}
+              <tr className="tr">
+                <td colSpan={16} className="lbl">Total / Aggregate</td>
+                <td style={{ fontWeight: 800, fontSize: '13px' }}>{gMax}</td>
+                <td style={{ fontWeight: 800, fontSize: '13px' }}>{gObt}</td>
+                <td colSpan={2}></td>
+              </tr>
+
+              {/* SUMMARY ROW */}
+              {(() => {
+                const overallPct = gMax ? (gObt / gMax) * 100 : 0;
+                const g2 = gradeInfo(overallPct);
+                const rl = anyFail ? '✘ FAIL' : '✔ PASS';
+                const rc = anyFail ? '#f87171' : '#4ade80';
+
+                return (
+                  <tr className="sumr">
+                    <td colSpan={7} className="lbl">Overall Result / Final Standing</td>
+                    <td></td>
+                    <td colSpan={4}></td>
+                    <td colSpan={4}></td>
+                    <td style={{ fontSize: '15px', fontWeight: 800, color: '#e8b655' }}>{gMax}</td>
+                    <td style={{ fontSize: '15px', fontWeight: 800, color: '#e8b655' }}>{gObt}</td>
+                    <td>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: barCol(overallPct) }}>
+                        {overallPct.toFixed(2)}%
+                      </div>
+                      <div className="bw">
+                        <div className="bf" style={{ width: `${overallPct.toFixed(1)}%`, background: barCol(overallPct) }}></div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`g ${g2.c}`}>{g2.l}</span><br />
+                      <span style={{ fontWeight: 800, color: rc }}>{rl}</span>
+                    </td>
+                  </tr>
+                );
+              })()}
+            </tbody>
+          </table>
+        </div>
+
+        {/* BOTTOM */}
+        <div className="bot">
+          {[
+            ['Class Teacher\'s Remarks', 'Excellent performance. Keep it up!', 'Class Teacher', 'Signature & Stamp'],
+            ['Parent / Guardian\'s Remarks', '', 'Parent / Guardian', 'Signature'],
+            ['Principal\'s Remarks', 'Well done. Strive for higher achievement.', 'Mr. Rajan Verma', 'Principal']
+          ].map(([label, text, sigName, sigRole], i) => (
+            <div className="bc" key={i}>
+              <div className="bl" contentEditable suppressContentEditableWarning>{label}</div>
+              <div className="rt" contentEditable suppressContentEditableWarning>{text}</div>
+              <div className="sl2"></div>
+              <div className="sn2" contentEditable suppressContentEditableWarning>{sigName}</div>
+              <div className="sr2" contentEditable suppressContentEditableWarning>{sigRole}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* FOOTER */}
+        <div className="cf">
+          <span className="fn" contentEditable suppressContentEditableWarning>This is a computer-generated mark sheet. Any alteration is a punishable offence under applicable law.</span>
+          <span className="fs" contentEditable suppressContentEditableWarning>{dateStr}</span>
+        </div>
+      </div>
+
+      {/* LEGEND */}
+      <div className="legend">
+        <span className="lt">GRADE SCALE:</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gAp">A+</span>90–100%</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gA">A</span>80–89%</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}><span className="g gBp">B+</span>70–79%</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }
